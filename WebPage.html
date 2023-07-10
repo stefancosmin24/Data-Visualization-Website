@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Data Visualisation Website</title>
+    <!-- W3 Schools Stylesheet-->
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-theme-black.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css">
+    <!-- Include Plotly JavaScript library -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://unpkg.com/vue@2.7.8/dist/vue.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="app">
+        <header class="w3-container w3-theme w3-padding" id="myHeader">
+            <i onclick="w3_open()" class="fa fa-bars w3-xlarge w3-button w3-theme"></i>
+            <div class="w3-center">
+
+                <h1 class="w3-xxxlarge w3-animate-bottom">{{sitename}}</h1>
+                <div class="w3-padding-32">
+                    <button class="w3-btn w3-xlarge w3-dark-grey w3-hover-light-grey" @click="togglePage"
+                        style="font-weight:900;">Check available stocks</button>
+                </div>
+            </div>
+        </header>
+
+        <div v-if="mainpage">
+            <div class="w3-row-padding w3-center w3-margin-top">
+                <div class="w3-third">
+                    <div class="w3-card w3-container" style="min-height:460px">
+                        <h3>Live stocks</h3><br>
+                        <i class="fa fa-desktop w3-margin-bottom w3-text-theme" style="font-size:120px"></i>
+                        <p>Available in real time</p>
+                        <p>Sourced from trusted APIs</p>
+                        <p>Sentiment analysis</p>
+                        <p>Predictions</p>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="w3-third">
+                        <div class="w3-card w3-container" style="min-height:460px">
+                            <img src="image.jpg" alt="" width="520px" height="380px">
+
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w3-third">
+                    <div class="w3-card w3-container" style="min-height:460px">
+                        <h3>Completly Serverless</h3><br>
+                        <i class="fa fa-css3 w3-margin-bottom w3-text-theme" style="font-size:120px"></i>
+                        <p>Using Amazon Web Services</p>
+                        <p>Back end runs in the cloud</p>
+                        <p>Front end hosted on Amazon S3</p>
+                        <p>Data visualisation using Plotly</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div v-else>
+            <div class="w3-row w3-border">
+                <div class="w3-third w3-container w3-light-grey">
+                    <h2>Check the available stocks</h2>
+                    <div class="w3-dropdown-hover">
+                        <button class="w3-button w3-black">Name</button>
+                        <div class="w3-dropdown-content w3-bar-block w3-border">
+                            <a @click="sendMessage(Tesla)" class="w3-bar-item w3-button">Tesla</a>
+                            <a @click="sendMessage(Apple)" class="w3-bar-item w3-button">Apple</a>
+                            <a @click="sendMessage(IBM)" class="w3-bar-item w3-button">IBM</a>
+                            <a @click="sendMessage(Microsoft)" class="w3-bar-item w3-button">Microsoft</a>
+                            <a @click="sendMessage(META)" class="w3-bar-item w3-button">META</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="w3-twothird w3-container w3-white">
+                    <div id="StockDiv" style="width:1200px;height:500px;"></div>
+                    <div v-if="show" class="pieChart">Pie Chart</div>
+                    <div id="myDiv"></div>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+    <!--Scripts-->
+
+    <script>
+        let webpage = new Vue({
+            el: '#app',
+
+            data: {
+                sitename: "Data Visualisation Webpage",
+                mainpage: true,
+                connection: new WebSocket("wss://6y8w5kkdmk.execute-api.us-east-1.amazonaws.com/prod"),
+                stockData: "",
+                pieData: "",
+                price: "",
+                timestamp: "",
+                Tesla: "Tesla",
+                IBM: "IBM",
+                META: "META",
+                Microsoft: "Microsoft",
+                Apple: "Apple",
+                show: false
+
+            },
+
+            created: function () {
+                let connection = this.connection;
+                connection.onopen = function (event) {
+                    console.log("Connected: " + JSON.stringify(event));
+                };
+
+                //Log errors
+                connection.onerror = function (error) {
+                    console.log("WebSocket Error: " + JSON.stringify(error));
+                }
+            },
+
+            computed: {
+
+
+            },
+
+            methods: {
+                togglePage() {
+                    this.mainpage = this.mainpage ? false : true;
+                },
+
+                async sendMessage(stockName) {
+                    //Get text from form
+                    let msgText = "";
+                    let stock = stockName;
+                    let act = "send" + stock + "Data";
+
+                    //Create message to be sent to server
+                    let msgObject = {
+                        action: act,//Used for routing in API Gateway
+                        data: msgText
+                    };
+
+                    //Send message
+                    await webpage.connection.send(JSON.stringify(msgObject));
+
+
+                    //Log result
+                    console.log("Message sent: " + JSON.stringify(msgObject));
+                    //Output messages from the server
+                    webpage.connection.onmessage = function (msg) {
+                        data = msg.data;
+                        console.log("Message received.");
+                        webpage.pieData = data.substring(0, data.indexOf(';'));
+                        webpage.price = data.substring(data.indexOf(';') + 1, data.lastIndexOf(';'));
+                        webpage.timestamp = data.substring(data.lastIndexOf(';'), data.lastIndexOf(','));
+                        webpage.plotData(stockName);
+                    }
+                    //Log errors
+                    webpage.connection.onerror = function (error) {
+                        console.log("WebSocket Error: " + JSON.stringify(error));
+                    }
+                    //setInterval(this.plotData, 1000);
+
+
+                },
+
+                plotData(stockName) {
+                    this.show = true;
+                    let priceGraph = this.price.split(",");
+                    let timeGraph = this.timestamp.split(",");
+                    let predicts = [];
+
+                    let x = "";
+                    //console.log(priceGraph);
+                    for (let i = 50; i >= 1; i--) {
+                        predicts += timeGraph[timeGraph.length - i];
+                    }
+                    for (let i = 50; i >= 1; i--) x = timeGraph.pop();
+                    
+                    let i = 0;let q ;
+                    let predictsTS = []; let j = 1;
+                    predictsTS[0] = priceGraph[priceGraph.length - 2];
+                    priceGraph.forEach(time => {
+                        q = new Date(parseInt(time));
+                        let startTimestamp = q.getTime();
+                        date = new Date(startTimestamp);
+                        priceGraph[i] = date.toLocaleString();
+                        i++;
+                    })
+
+                    //let predictsTS = []; let j = 1;
+                    //predictsTS[0] = priceGraph[i - 2];
+                    for(let j=1;j<50;j++){
+                        let z = (predictsTS[j - 1]);
+                        predictsTS[j] = parseInt(z) + 3600;
+                       
+                    }
+                    i=0;
+                    predictsTS.forEach(time => {
+                        q = new Date(parseInt(time));
+                        let startTimestamp = q.getTime();
+                        date = new Date(startTimestamp);
+                        predictsTS[i] = date.toLocaleString();
+                        i++;
+                    })
+                    console.log(predictsTS[12]);
+                    console.log(predicts[2]);
+                    let predictsP = predicts.split(" ");
+                    console.log(predictsP[1]);
+                    //Specify how chart should be drawn
+                    let trace1 = {
+                        x: priceGraph,
+                        y: timeGraph,
+                        mode: 'line',
+                        name: stockName,
+                        marker: {
+                            color: 'rgb(219, 64, 82)',
+                            size: 12
+                        }
+                    };
+                    let trace2 = {
+                        x: predictsTS,
+                        y: predictsP,
+                        mode: 'line',
+                        name: 'prediction',
+                        marker: {
+                            color: 'rgb(94, 255, 0)',
+                            size: 12
+                        }
+                    };
+                    let name = stockName;
+                    //Get reference to Div where chart will be drawn
+                    let chartDiv = "StockDiv";
+
+                    //Upper case the start of the currency name and create title of chart
+                    let chartTitle = name.charAt(0).toUpperCase() + name.slice(1);
+
+                    //Set up graph
+                    let layout = {
+                        title: chartTitle,
+                        xaxis: {
+                            title: ''
+                        },
+                        yaxis: {
+                            title: 'Price($)'
+                        }
+                    };
+
+                    //Data for graph is an array of lines for graph
+                    let data = [trace1,trace2];
+
+                    //Plot data
+                    Plotly.newPlot(chartDiv, data, layout);
+
+                    let pie = this.pieData.split(",");
+
+                    let pieGraph = [{
+                        values: pie,
+                        labels: ['Positive', 'Negative', 'Neutral'],
+                        type: 'pie'
+                    }];
+
+                    const pieLayout = {
+                        height: 400,
+                        width: 500
+                    };
+                    Plotly.react('myDiv', pieGraph, pieLayout);
+
+                },
+                displayData(stockName) {
+
+                    let result = webpage.sendMessage(stockName);
+                    //webpage.plotData(stockName);
+                    webpage.plotData(stockName);
+
+                }
+
+
+            }
+        })
+    </script>
+</body>
+
+</html>
